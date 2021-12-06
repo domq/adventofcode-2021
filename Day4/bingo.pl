@@ -5,6 +5,8 @@ use strict;
 use v5.21;
 use autodie qw(:all);
 
+our $WHOWINS = "squid";
+
 sub load {
   my ($file) = @_;
 
@@ -37,12 +39,28 @@ sub play {
   return { state => "stalemate" } unless defined(
     my $drawn = shift @{$game->{numbers}});
 
+  my %winning_boards;
+  local $_;
   foreach (@{$game->{boards}}) {
     s| (${drawn})\b|$1<|;
     if (defined(my $score = won($_))) {
-      return { state => "won", score => $score * $drawn };
+      if ($WHOWINS eq "submarine") {
+        return { state => "submarine-won", score => $score * $drawn };
+      } else {
+        $winning_boards{$_} = $score;
+      }
     }
   }
+
+  if (%winning_boards) {
+    $game->{boards} = [ grep { ! $winning_boards{$_} } @{$game->{boards}} ];
+    if (! @{$game->{boards}}) {
+      # Last board won; we know how to let the squid win
+      my (@scores) = values %winning_boards;
+      return { state => "squid-won", score => $scores[0] * $drawn };
+    }
+  }
+
   return { state => "playing" };
 }
 
